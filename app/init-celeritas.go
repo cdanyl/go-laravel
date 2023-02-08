@@ -2,9 +2,10 @@ package main
 
 import (
 	"app/handlers"
-	"github.com/cdanyl/celeritas"
 	"log"
 	"os"
+
+	"github.com/cdanyl/celeritas"
 )
 
 func initApplication() *application {
@@ -13,16 +14,18 @@ func initApplication() *application {
 		log.Fatal(err)
 	}
 
-	cel := &celeritas.Celeritas{
-		AppName: "app",
-	}
-
+	// init celeritas
+	cel := &celeritas.Celeritas{}
 	err = cel.New(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	myHandlers := &handlers.Handlers{App: cel}
+	cel.AppName = "myapp"
+
+	myHandlers := &handlers.Handlers{
+		App: cel,
+	}
 
 	app := &application{
 		App:      cel,

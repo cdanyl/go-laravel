@@ -2,18 +2,23 @@ package celeritas
 
 import (
 	"fmt"
-	"github.com/cdanyl/celeritas/render"
-	"github.com/go-chi/chi/v5"
-	"github.com/joho/godotenv"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/CloudyKit/jet/v6"
+	"github.com/cdanyl/celeritas/render"
+	"github.com/go-chi/chi/v5"
+
+	"github.com/joho/godotenv"
 )
 
 const version = "1.0.0"
 
+// Celeritas is the overall type for the Celeritas package. Members that are exported in this type
+// are available to any application that uses it.
 type Celeritas struct {
 	AppName  string
 	Debug    bool
@@ -23,6 +28,7 @@ type Celeritas struct {
 	RootPath string
 	Routes   *chi.Mux
 	Render   *render.Render
+	JetViews *jet.Set
 	config   config
 }
 
@@ -31,6 +37,8 @@ type config struct {
 	renderer string
 }
 
+// New reads the .env file, creates our application config, populates the Celeritas type with settings
+// based on .env values, and creates necessary folders and files if they don't exist
 func (c *Celeritas) New(rootPath string) error {
 	pathConfig := initPaths{
 		rootPath:    rootPath,
@@ -67,22 +75,45 @@ func (c *Celeritas) New(rootPath string) error {
 		renderer: os.Getenv("RENDERER"),
 	}
 
-	c.Render = c.createRenderer(c)
+	var views = jet.NewSet(
+		jet.NewOSFileSystemLoader(fmt.Sprintf("%s/views", rootPath)),
+		jet.InDevelopmentMode(),
+	)
+
+	c.JetViews = views
+
+	c.createRenderer()
 
 	return nil
 }
 
+// Init creates necessary folders for our Celeritas application
 func (c *Celeritas) Init(p initPaths) error {
 	root := p.rootPath
-
 	for _, path := range p.folderNames {
+		// create folder if it doesn't exist
 		err := c.CreateDirIfNotExist(root + "/" + path)
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
+}
+
+// ListenAndServe starts the web server
+func (c *Celeritas) ListenAndServe() {
+	srv := &http.Server{
+		Addr:         fmt.Sprintf(":%s", os.Getenv("PORT")),
+		ErrorLog:     c.ErrorLog,
+		Handler:      c.Routes,
+		IdleTimeout:  30 * time.Second,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 600 * time.Second,
+	}
+
+	c.InfoLog.Printf("Listening on port %s", os.Getenv("PORT"))
+	err := srv.ListenAndServe()
+	c.ErrorLog.Fatal(err)
 }
 
 func (c *Celeritas) checkDotEnv(path string) error {
@@ -90,7 +121,6 @@ func (c *Celeritas) checkDotEnv(path string) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -104,28 +134,12 @@ func (c *Celeritas) startLoggers() (*log.Logger, *log.Logger) {
 	return infoLog, errorLog
 }
 
-func (c *Celeritas) ListenAndServe() {
-	srv := &http.Server{
-		Addr:              fmt.Sprintf(":%s", os.Getenv("PORT")),
-		Handler:           c.Routes,
-		ErrorLog:          c.ErrorLog,
-		IdleTimeout:       30 * time.Second,
-		ReadHeaderTimeout: 30 * time.Second,
-		WriteTimeout:      600 * time.Second,
-	}
-
-	c.InfoLog.Println("Listening on port ", os.Getenv("PORT"))
-
-	err := srv.ListenAndServe()
-	c.ErrorLog.Fatal(err)
-}
-
-func (c *Celeritas) createRenderer(cel *Celeritas) *render.Render {
+func (c *Celeritas) createRenderer() {
 	myRenderer := render.Render{
-		Renderer: cel.config.renderer,
-		RootPath: cel.RootPath,
-		Port:     cel.config.port,
+		Renderer: c.config.renderer,
+		RootPath: c.RootPath,
+		Port:     c.config.port,
+		JetViews: c.JetViews,
 	}
-
-	return &myRenderer
+	c.Render = &myRenderer
 }

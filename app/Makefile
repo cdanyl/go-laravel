@@ -2,10 +2,10 @@ BINARY_NAME=celeritasApp
 
 build:
 	@echo "Building Celeritas..."
-	@go build -o tmp/${BINARY_NAME}
+	@go build -o tmp/${BINARY_NAME} .
 	@echo "Celeritas built!"
 
-run:build
+run: build
 	@echo "Starting Celeritas..."
 	@./tmp/${BINARY_NAME} &
 	@echo "Celeritas started!"

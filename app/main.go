@@ -2,6 +2,7 @@ package main
 
 import (
 	"app/handlers"
+
 	"github.com/cdanyl/celeritas"
 )
 
